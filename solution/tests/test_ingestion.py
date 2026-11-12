@@ -92,3 +92,61 @@ def test_override_link_by_call_id(tmp_path):
         db.execute("select lead_id from events where event_id='e2'").fetchone()[0]
         is not None
     )
+
+
+def test_blank_rows_do_not_affect_rejection_row_numbers(tmp_path):
+    f = tmp_path / "batch_002.csv"
+    f.write_text(
+        "customer_name,phone,policy_number\\n"
+        "Asha,9876543210,P1\\n"
+        " , , \\n"
+        "Ravi,12345,P2\\n"
+    )
+    db = connect(":memory:")
+    result = ingest_lead_file(db, f, schema(), "drop_1")
+    assert result["rows"] == 2
+    rejection = db.execute(
+        "SELECT row_number,reason FROM rejections"
+    ).fetchone()
+    assert tuple(rejection) == (2, "invalid_phone")
+
+
+def test_event_phone_is_not_stored_in_raw_json(tmp_path):
+    db = connect(":memory:")
+    event = {
+        "event_id": "private-event",
+        "event_type": "call.initiated",
+        "workflow_id": "motor_renewal",
+        "call_id": "private-call",
+        "occurred_at": "2026-10-01T10:00:00Z",
+        "phone": "9876543210",
+        "payload": {},
+    }
+    path = tmp_path / "events.jsonl"
+    path.write_text(json.dumps(event) + "\\n")
+    ingest_event_file(db, path, {"motor_renewal": set()}, "drop_1")
+    stored = db.execute(
+        "SELECT raw_json,phone_hash FROM events"
+    ).fetchone()
+    assert "9876543210" not in stored["raw_json"]
+    assert stored["phone_hash"]
+
+
+def test_unknown_disposition_without_code_is_not_known(tmp_path):
+    db = connect(":memory:")
+    event = {
+        "event_id": "unknown-event",
+        "event_type": "disposition.set",
+        "workflow_id": "motor_renewal",
+        "call_id": "call-1",
+        "occurred_at": "2026-10-01T10:00:00Z",
+        "phone": "9876543210",
+        "payload": {},
+    }
+    path = tmp_path / "events.jsonl"
+    path.write_text(json.dumps(event) + "\\n")
+    ingest_event_file(db, path, {"motor_renewal": {"renewed"}}, "drop_1")
+    known = db.execute(
+        "SELECT disposition_known FROM events WHERE event_id='unknown-event'"
+    ).fetchone()[0]
+    assert known == 0
