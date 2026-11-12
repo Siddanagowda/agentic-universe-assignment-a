@@ -105,7 +105,10 @@ def main():
             "duplicate_events_dropped": q.get("duplicate_events_dropped", 0),
             "orphan_events": 0,
             "unknown_disposition_events": conn.execute(
-                "SELECT COUNT(*) FROM events WHERE disposition_known=0"
+                """SELECT COUNT(*) FROM events
+                   WHERE lead_id IS NOT NULL
+                     AND event_type IN ('disposition.set','disposition.override')
+                     AND disposition_known=0"""
             ).fetchone()[0],
         }
         generate_reports(conn, args.out, disp, quality)
