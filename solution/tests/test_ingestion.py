@@ -97,10 +97,10 @@ def test_override_link_by_call_id(tmp_path):
 def test_blank_rows_do_not_affect_rejection_row_numbers(tmp_path):
     f = tmp_path / "batch_002.csv"
     f.write_text(
-        "customer_name,phone,policy_number\\n"
-        "Asha,9876543210,P1\\n"
-        " , , \\n"
-        "Ravi,12345,P2\\n"
+        "customer_name,phone,policy_number\n"
+        "Asha,9876543210,P1\n"
+        " , , \n"
+        "Ravi,12345,P2\n"
     )
     db = connect(":memory:")
     result = ingest_lead_file(db, f, schema(), "drop_1")
@@ -123,7 +123,7 @@ def test_event_phone_is_not_stored_in_raw_json(tmp_path):
         "payload": {},
     }
     path = tmp_path / "events.jsonl"
-    path.write_text(json.dumps(event) + "\\n")
+    path.write_text(json.dumps(event) + "\n")
     ingest_event_file(db, path, {"motor_renewal": set()}, "drop_1")
     stored = db.execute(
         "SELECT raw_json,phone_hash FROM events"
@@ -144,7 +144,7 @@ def test_unknown_disposition_without_code_is_not_known(tmp_path):
         "payload": {},
     }
     path = tmp_path / "events.jsonl"
-    path.write_text(json.dumps(event) + "\\n")
+    path.write_text(json.dumps(event) + "\n")
     ingest_event_file(db, path, {"motor_renewal": {"renewed"}}, "drop_1")
     known = db.execute(
         "SELECT disposition_known FROM events WHERE event_id='unknown-event'"
